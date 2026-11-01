@@ -8,7 +8,7 @@ Pistes de sécurisation complémentaires au tutoriel `item.md`, classées par pr
 - Le port 21114 (API Pro) et les ports 21118/21119 (client web) ne sont pas exposés.
 - Les règles ufw `route` limitent le trafic redirigé au conteneur `rustdesk`.
 - Le serveur HTTP proposé par le script d'installation n'est pas installé.
-- La paire de clés et la base sont sauvegardées (section 14).
+- La paire de clés et la base sont sauvegardées (section 12).
 
 ## Priorité haute
 

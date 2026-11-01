@@ -12,7 +12,7 @@ Pistes d'amélioration pour `item.md` (« Installer un serveur RustDesk dans un 
 
 ### Contenu à vérifier ou sourcer
 
-- [ ] **Priorité de la souris locale** (section 12) : « la fonction existe dans le code mais elle est désactivée » doit être sourcée (issue ou commit GitHub) ou reformulée.
+- [ ] **Priorité de la souris locale** (section 14, FAQ) : « la fonction existe dans le code mais elle est désactivée » doit être sourcée (issue ou commit GitHub) ou reformulée.
 
 ### Sections à ajouter
 
@@ -39,3 +39,5 @@ Pistes d'amélioration pour `item.md` (« Installer un serveur RustDesk dans un 
 - [x] Section 6 : nom de domaine déplacé avant l'installation, note sur la clé publique remontée juste après la sortie du script.
 - [x] hbbs / hbbr définis en introduction, petit lexique (proxy device, DNAT, hole punching, INPUT/FORWARD) dans « Principe ».
 - [x] Ton harmonisé à l'infinitif (suppression du tutoiement).
+- [x] Section 9 : note sur les clients Windows, macOS, Debian/Ubuntu et Android.
+- [x] Sections réordonnées : Sauvegarde (12) avant Maintenance (13), « Remarques » sur la souris déplacées en FAQ (14).

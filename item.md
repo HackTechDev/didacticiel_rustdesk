@@ -69,7 +69,7 @@ LXD est un gestionnaire de **conteneurs système** développé par Canonical. Un
 - **Isolation** : RustDesk tourne à part, sans toucher au système de l'hôte ni aux autres services.
 - **Légèreté** : pas de noyau séparé comme dans une machine virtuelle. Le conteneur démarre en quelques secondes et consomme peu de mémoire.
 - **Simplicité** : on l'administre comme un serveur Debian classique. Le script d'installation fonctionne donc tel quel.
-- **Sauvegarde et retour arrière** : snapshots et export du conteneur en une commande (voir [Sauvegarde](#14-sauvegarde)).
+- **Sauvegarde et retour arrière** : snapshots et export du conteneur en une commande (voir [Sauvegarde](#12-sauvegarde)).
 - **Nettoyage facile** : supprimer le conteneur retire RustDesk sans laisser de traces sur l'hôte.
 
 **Inconvénients**
@@ -419,6 +419,8 @@ utilisateur@poste:~$ ./rustdesk-1.5.0-x86_64.AppImage
 
 ![Fenêtre principale de RustDesk](rustdesk01.png)
 
+> Sur les autres systèmes, télécharger le fichier correspondant sur la même page : `.exe` ou `.msi` pour Windows, `.dmg` pour macOS, `.deb` pour Debian/Ubuntu, `.apk` pour Android. La configuration de l'étape 10 est la même ; seule la disposition des menus varie un peu, notamment sur Android.
+
 ## 10. Configuration des clients RustDesk
 
 Sur **chaque poste** (celui qui contrôle et celui qui est contrôlé) :
@@ -496,72 +498,7 @@ fallback failed: Failed to connect to rs-ny.rustdesk.com:21116
 - Vérifier que les deux postes affichent « Prêt ».
 - Utiliser l'ID affiché **après** le changement de serveur.
 
-## 12. Remarques
-
-### Garder la priorité sur sa souris pendant une session
-
-RustDesk ne donne pas la priorité à la souris locale : la fonction existe dans le code, mais elle est désactivée. Sur le poste contrôlé, on peut :
-
-- couper ou rendre le contrôle clavier/souris en un clic, depuis l'icône dédiée de la fenêtre de connexion ;
-- passer en lecture seule par défaut : **Paramètres > Sécurité > Permissions**, puis décocher « Activer le clavier/la souris ».
-
-## 13. Maintenance
-
-### Mise à jour du serveur
-
-Le dépôt [techahold/rustdeskinstall](https://github.com/techahold/rustdeskinstall) fournit un script `update.sh` qui télécharge la dernière version de hbbs et hbbr.
-
-- Sur l'hôte, créer d'abord un snapshot pour pouvoir revenir en arrière (voir [Sauvegarde](#14-sauvegarde)) :
-
-```bash
-utilisateur@serveur:~$ lxc snapshot rustdesk avant-maj
-```
-
-- Entrer dans le conteneur :
-
-```bash
-utilisateur@serveur:~$ lxc exec rustdesk -- bash
-root@rustdesk:~#
-```
-
-- Télécharger le script de mise à jour :
-
-```bash
-root@rustdesk:~# wget https://raw.githubusercontent.com/techahold/rustdeskinstall/master/update.sh
-```
-
-- Rendre le script exécutable, puis le lancer :
-
-```bash
-root@rustdesk:~# chmod +x update.sh
-root@rustdesk:~# ./update.sh
-```
-
-- Vérifier que les services sont relancés :
-
-```bash
-root@rustdesk:~# systemctl list-units | grep -i rust
-  rustdeskrelay.service    loaded active running   Rustdesk Relay Server
-  rustdesksignal.service   loaded active running   Rustdesk Signal Server
-```
-
-- Si tout fonctionne, supprimer le snapshot depuis l'hôte :
-
-```bash
-utilisateur@serveur:~$ lxc delete rustdesk/avant-maj
-```
-
-> En cas de problème après la mise à jour : `lxc restore rustdesk avant-maj` sur l'hôte.
-
-La mise à jour conserve la paire de clés : les clients n'ont rien à reconfigurer.
-
-### Commandes utiles
-
-- **Clé publique** : `/opt/rustdesk/id_ed25519.pub`.
-- **Redémarrer les services** : `systemctl restart rustdesksignal rustdeskrelay`
-- **Consulter les journaux** : `journalctl -u rustdesksignal -u rustdeskrelay -f`
-
-## 14. Sauvegarde
+## 12. Sauvegarde
 
 Deux éléments sont à protéger :
 
@@ -654,6 +591,71 @@ utilisateur@serveur:~$ lxc exec rustdesk -- systemctl restart rustdesksignal rus
 ```
 
 Les clients gardent la même clé : aucune reconfiguration n'est nécessaire.
+
+## 13. Maintenance
+
+### Mise à jour du serveur
+
+Le dépôt [techahold/rustdeskinstall](https://github.com/techahold/rustdeskinstall) fournit un script `update.sh` qui télécharge la dernière version de hbbs et hbbr.
+
+- Sur l'hôte, créer d'abord un snapshot pour pouvoir revenir en arrière (voir [Sauvegarde](#12-sauvegarde)) :
+
+```bash
+utilisateur@serveur:~$ lxc snapshot rustdesk avant-maj
+```
+
+- Entrer dans le conteneur :
+
+```bash
+utilisateur@serveur:~$ lxc exec rustdesk -- bash
+root@rustdesk:~#
+```
+
+- Télécharger le script de mise à jour :
+
+```bash
+root@rustdesk:~# wget https://raw.githubusercontent.com/techahold/rustdeskinstall/master/update.sh
+```
+
+- Rendre le script exécutable, puis le lancer :
+
+```bash
+root@rustdesk:~# chmod +x update.sh
+root@rustdesk:~# ./update.sh
+```
+
+- Vérifier que les services sont relancés :
+
+```bash
+root@rustdesk:~# systemctl list-units | grep -i rust
+  rustdeskrelay.service    loaded active running   Rustdesk Relay Server
+  rustdesksignal.service   loaded active running   Rustdesk Signal Server
+```
+
+- Si tout fonctionne, supprimer le snapshot depuis l'hôte :
+
+```bash
+utilisateur@serveur:~$ lxc delete rustdesk/avant-maj
+```
+
+> En cas de problème après la mise à jour : `lxc restore rustdesk avant-maj` sur l'hôte.
+
+La mise à jour conserve la paire de clés : les clients n'ont rien à reconfigurer.
+
+### Commandes utiles
+
+- **Clé publique** : `/opt/rustdesk/id_ed25519.pub`.
+- **Redémarrer les services** : `systemctl restart rustdesksignal rustdeskrelay`
+- **Consulter les journaux** : `journalctl -u rustdesksignal -u rustdeskrelay -f`
+
+## 14. FAQ
+
+### Garder la priorité sur sa souris pendant une session
+
+RustDesk ne donne pas la priorité à la souris locale : la fonction existe dans le code, mais elle est désactivée. Sur le poste contrôlé, on peut :
+
+- couper ou rendre le contrôle clavier/souris en un clic, depuis l'icône dédiée de la fenêtre de connexion ;
+- passer en lecture seule par défaut : **Paramètres > Sécurité > Permissions**, puis décocher « Activer le clavier/la souris ».
 
 ## 15. Sources
 
