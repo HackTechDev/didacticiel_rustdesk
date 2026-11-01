@@ -29,9 +29,14 @@ metadata:
 published: true
 ---
 
-Ce tutoriel explique comment héberger son propre serveur RustDesk (hbbs + hbbr) dans un conteneur LXD, à l'aide du script d'installation [techahold/rustdeskinstall](https://github.com/techahold/rustdeskinstall). C'est la méthode 2 de la [documentation officielle](https://rustdesk.com/docs/en/self-host/rustdesk-server-oss/install/).
+Ce tutoriel explique comment héberger son propre serveur RustDesk dans un conteneur LXD, à l'aide du script d'installation [techahold/rustdeskinstall](https://github.com/techahold/rustdeskinstall). C'est la méthode 2 de la [documentation officielle](https://rustdesk.com/docs/en/self-host/rustdesk-server-oss/install/).
 
-> Les adresses, noms et clés de ce tutoriel sont des **exemples**. Remplace-les par tes propres valeurs.
+Un serveur RustDesk se compose de deux programmes :
+
+- **hbbs**, le **serveur ID** (ou serveur de rendez-vous) : il enregistre les postes et les met en relation ;
+- **hbbr**, le **relais** : il fait transiter le trafic quand les deux postes ne peuvent pas se connecter directement.
+
+> Les adresses, noms et clés de ce tutoriel sont des **exemples**. Les remplacer par ses propres valeurs.
 
 ## Valeurs utilisées dans ce tutoriel
 
@@ -81,6 +86,13 @@ LXD est un gestionnaire de **conteneurs système** développé par Canonical. Un
 Le conteneur se trouve sur un réseau privé (`lxdbr0`). Les ports RustDesk sont redirigés depuis l'IP publique de l'hôte vers le conteneur grâce à des **proxy devices LXD en mode `nat=true`**.
 
 Ce mode est essentiel : il préserve l'**IP réelle des clients**. Le serveur ID (hbbs) en a besoin pour établir des connexions directes entre les postes (*hole punching*). Sans lui, tout le trafic passe par le relais.
+
+Quelques termes utilisés dans la suite :
+
+- **Proxy device** : redirection de port gérée par LXD, qui transmet le trafic arrivant sur l'hôte vers le conteneur.
+- **NAT / DNAT** : réécriture de l'adresse de destination des paquets. Avec `nat=true`, LXD crée cette règle dans le noyau de l'hôte, au lieu de faire transiter le trafic par un programme intermédiaire. L'IP d'origine du client est ainsi conservée.
+- **Hole punching** : technique qui permet à deux postes situés derrière des box ou des pare-feu de se connecter directement l'un à l'autre, avec l'aide du serveur ID.
+- **INPUT / FORWARD** : chaînes du pare-feu Linux. *INPUT* filtre le trafic destiné à l'hôte lui-même, *FORWARD* celui qui le traverse pour aller ailleurs (ici, vers le conteneur).
 
 ---
 
@@ -171,7 +183,7 @@ utilisateur@serveur:~$ ip -4 addr show scope global
 
 L'IP publique est `203.0.113.10`, sur l'interface externe `eno1`. Ne pas la confondre avec `lxdbr0` (bridge LXD) ni avec `lxcbr0` (ancien bridge LXC, souvent inactif).
 
-> Ici, la mention `dynamic` indique que l'IP est attribuée par DHCP. Les proxy devices écoutent sur cette adresse précise : si elle change, la redirection cesse de fonctionner et il faut recréer les proxy devices. Assure-toi que l'hébergeur garantit une IP stable.
+> Ici, la mention `dynamic` indique que l'IP est attribuée par DHCP. Les proxy devices écoutent sur cette adresse précise : si elle change, la redirection cesse de fonctionner et il faut recréer les proxy devices. Vérifier que l'hébergeur garantit une IP stable.
 
 ## 5. Redirection des ports (proxy devices LXD)
 
@@ -241,6 +253,34 @@ utilisateur@serveur:~$ sudo ufw route allow proto udp to 10.10.10.50 port 21116
 
 ## 6. Installation de RustDesk dans le conteneur
 
+### Avant de commencer : utiliser un nom de domaine (facultatif, conseillé)
+
+Le script demande si les clients joindront le serveur par son IP ou par un nom de domaine. Ce choix est à faire **avant** de lancer l'installation.
+
+Avec un nom de domaine, les clients ne dépendent plus de l'IP du serveur. Si l'IP change, ou si le serveur est déplacé sur un autre hôte, il suffit de modifier l'enregistrement DNS : aucun client n'est à reconfigurer.
+
+- Chez le fournisseur DNS, créer un enregistrement **A** qui pointe vers l'IP publique de l'hôte :
+
+| Nom                    | Type | Valeur         |
+|------------------------|------|----------------|
+| `rustdesk.example.com` | A    | `203.0.113.10` |
+
+- Vérifier depuis le poste que le nom est bien résolu :
+
+```bash
+utilisateur@poste:~$ dig +short rustdesk.example.com
+203.0.113.10
+```
+
+- Au lancement de `install.sh` (plus bas), répondre `2` (DNS/Domain) à la première question, puis saisir `rustdesk.example.com`.
+- Dans les clients (étape 10), indiquer `rustdesk.example.com` comme **Serveur ID** au lieu de l'IP.
+
+> Les proxy devices LXD (étape 5) écoutent toujours sur l'IP publique de l'hôte : le nom de domaine ne change rien côté serveur. En cas de changement d'IP, il faut donc mettre à jour **à la fois** l'enregistrement DNS et l'adresse `listen` des proxy devices.
+
+Si le serveur a déjà été installé avec une IP, il n'est pas nécessaire de relancer le script : il suffit de créer l'enregistrement DNS et de remplacer l'IP par le nom dans les clients. La clé reste la même.
+
+### Installation
+
 - Entrer dans le conteneur :
 
 ```bash
@@ -305,34 +345,12 @@ Réponses aux questions du script :
 
 | Question du script                                         | Signification                                         | Réponse conseillée                                                |
 |------------------------------------------------------------|-------------------------------------------------------|-------------------------------------------------------------------|
-| *Choose your preferred connection method*                  | Méthode de connexion (IP ou DNS)                      | `1` : IP (détection automatique), ou `2` si tu as un nom de domaine |
+| *Choose your preferred connection method*                  | Méthode de connexion (IP ou DNS)                      | `1` : IP (détection automatique), ou `2` avec un nom de domaine   |
 | *Please choose if you want to download configs and install HTTP server* | Télécharger les configs et installer un serveur HTTP | `2` : Non (évite d'exposer un service web supplémentaire)         |
 
-### Utiliser un nom de domaine plutôt qu'une IP (conseillé)
+> **Noter la clé publique** affichée à la fin (`Your public key is …`). Elle sera demandée par chaque client à l'étape 10.
 
-Avec un nom de domaine, les clients ne dépendent plus de l'IP du serveur. Si l'IP change, ou si le serveur est déplacé sur un autre hôte, il suffit de modifier l'enregistrement DNS : aucun client n'est à reconfigurer.
-
-- Chez ton fournisseur DNS, créer un enregistrement **A** qui pointe vers l'IP publique de l'hôte :
-
-| Nom                    | Type | Valeur         |
-|------------------------|------|----------------|
-| `rustdesk.example.com` | A    | `203.0.113.10` |
-
-- Vérifier depuis le poste que le nom est bien résolu :
-
-```bash
-utilisateur@poste:~$ dig +short rustdesk.example.com
-203.0.113.10
-```
-
-- Au lancement de `install.sh`, répondre `2` (DNS/Domain) à la première question, puis saisir `rustdesk.example.com`.
-- Dans les clients (étape 10), indiquer `rustdesk.example.com` comme **Serveur ID** au lieu de l'IP.
-
-> Les proxy devices LXD (étape 5) écoutent toujours sur l'IP publique de l'hôte : le nom de domaine ne change rien côté serveur. En cas de changement d'IP, il faut donc mettre à jour **à la fois** l'enregistrement DNS et l'adresse `listen` des proxy devices.
-
-Si le serveur a déjà été installé avec une IP, il n'est pas nécessaire de relancer le script : il suffit de créer l'enregistrement DNS et de remplacer l'IP par le nom dans les clients. La clé reste la même.
-
-**Note la clé publique.** Elle reste disponible dans le conteneur :
+Elle reste disponible dans le conteneur :
 
 ```bash
 root@rustdesk:~# cat /opt/rustdesk/id_ed25519.pub
@@ -606,7 +624,7 @@ utilisateur@serveur:~$ chmod 600 ~/sauvegarde-rustdesk/id_ed25519
 utilisateur@poste:~$ scp -r utilisateur@serveur.example.com:sauvegarde-rustdesk ~/
 ```
 
-> `id_ed25519` est la **clé privée** du serveur. Ne la partage jamais et conserve-la dans un endroit sûr.
+> `id_ed25519` est la **clé privée** du serveur. Ne jamais la partager et la conserver dans un endroit sûr.
 
 ### Export complet du conteneur
 

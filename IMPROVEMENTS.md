@@ -36,3 +36,6 @@ Pistes d'amélioration pour `item.md` (« Installer un serveur RustDesk dans un 
 - [x] Section 13 « Maintenance » : procédure de mise à jour complète (snapshot, `update.sh`, vérification, retour arrière).
 - [x] Section 6 : sous-partie « Utiliser un nom de domaine » (enregistrement A, vérification `dig`, choix `2` du script, configuration des clients, passage d'une IP à un nom).
 - [x] Informations sur les ports 21118/21119 retirées (inutiles : ports non redirigés, pas de client web).
+- [x] Section 6 : nom de domaine déplacé avant l'installation, note sur la clé publique remontée juste après la sortie du script.
+- [x] hbbs / hbbr définis en introduction, petit lexique (proxy device, DNAT, hole punching, INPUT/FORWARD) dans « Principe ».
+- [x] Ton harmonisé à l'infinitif (suppression du tutoiement).
