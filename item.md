@@ -55,6 +55,27 @@ Ce tutoriel explique comment héberger son propre serveur RustDesk (hbbs + hbbr)
 - Un accès SSH avec les droits sudo.
 - Une IP publique fixe, ou un nom de domaine qui pointe dessus.
 
+## Pourquoi LXD ?
+
+LXD est un gestionnaire de **conteneurs système** développé par Canonical. Un conteneur LXD se comporte comme une petite machine Linux complète (systemd, apt, services), mais il partage le noyau de l'hôte. C'est la différence avec Docker, dont les conteneurs n'embarquent en général qu'une seule application.
+
+**Avantages**
+
+- **Isolation** : RustDesk tourne à part, sans toucher au système de l'hôte ni aux autres services.
+- **Légèreté** : pas de noyau séparé comme dans une machine virtuelle. Le conteneur démarre en quelques secondes et consomme peu de mémoire.
+- **Simplicité** : on l'administre comme un serveur Debian classique. Le script d'installation fonctionne donc tel quel.
+- **Sauvegarde et retour arrière** : snapshots et export du conteneur en une commande (voir [Sauvegarde](#14-sauvegarde)).
+- **Nettoyage facile** : supprimer le conteneur retire RustDesk sans laisser de traces sur l'hôte.
+
+**Inconvénients**
+
+- **Isolation moins forte qu'une VM** : le noyau est partagé avec l'hôte. Une faille du noyau peut toucher tous les conteneurs.
+- **Réseau plus complexe** : le conteneur est sur un réseau privé. Il faut une IP fixe et des proxy devices pour l'exposer.
+- **Une couche de plus à maintenir** : il faut mettre à jour l'hôte **et** le conteneur.
+- **Moins documenté** : la documentation de RustDesk traite surtout de Docker et de l'installation directe sur l'hôte.
+
+> Incus, le fork communautaire de LXD, s'utilise de la même façon : les commandes `lxc` deviennent `incus`.
+
 ## Principe
 
 Le conteneur se trouve sur un réseau privé (`lxdbr0`). Les ports RustDesk sont redirigés depuis l'IP publique de l'hôte vers le conteneur grâce à des **proxy devices LXD en mode `nat=true`**.
