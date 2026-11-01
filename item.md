@@ -38,6 +38,40 @@ Un serveur RustDesk se compose de deux programmes :
 
 > Les adresses, noms et clés de ce tutoriel sont des **exemples**. Les remplacer par ses propres valeurs.
 
+## Un cas d'usage parmi d'autres
+
+Ce tutoriel décrit **une** installation précise, adaptée à un besoin particulier :
+
+- un serveur Ubuntu qui héberge déjà d'autres services dans des conteneurs LXD ;
+- le serveur RustDesk **OSS** (gratuit), installé avec un script tiers dans un conteneur Debian ;
+- des postes clients sous Linux, avec le client au format AppImage.
+
+Ce n'est ni la seule méthode, ni forcément la meilleure pour tous les cas. Il existe d'autres façons d'installer le serveur et le client.
+
+**Serveur**
+
+| Méthode | Pour qui |
+|---|---|
+| **Docker** (image officielle `rustdesk/rustdesk-server`) | Ceux qui utilisent déjà Docker ou Docker Compose : c'est la méthode mise en avant par la documentation officielle |
+| **Paquets `.deb`** de [rustdesk-server](https://github.com/rustdesk/rustdesk-server/releases) | Une installation directe sur Debian/Ubuntu, sans script tiers |
+| **Binaires** `hbbs` / `hbbr` lancés comme services systemd | Ceux qui veulent tout maîtriser, sur n'importe quelle distribution |
+| **Script** [techahold/rustdeskinstall](https://github.com/techahold/rustdeskinstall) | Une installation rapide et guidée (méthode de ce tutoriel) |
+| **RustDesk Server Pro** (payant) | Les organisations qui ont besoin de comptes, d'un carnet d'adresses partagé, d'une console web ou de clients personnalisés |
+
+Le serveur peut aussi tourner directement sur l'hôte, dans une machine virtuelle ou sur un petit VPS, sans LXD.
+
+**Client**
+
+| Système | Formats disponibles |
+|---|---|
+| Linux | AppImage (ce tutoriel), `.deb`, `.rpm`, Flatpak |
+| Windows | Installateur `.exe` ou `.msi` |
+| macOS | `.dmg` |
+| Android | `.apk`, F-Droid |
+| iOS | App Store (permet de contrôler un poste, pas d'être contrôlé) |
+
+Tous les clients se téléchargent depuis la [page des releases](https://github.com/rustdesk/rustdesk/releases) ou le [site de RustDesk](https://rustdesk.com/). Quelle que soit la méthode, la configuration du client est la même : **serveur ID** et **clé** (étape 10).
+
 ## Valeurs utilisées dans ce tutoriel
 
 | Élément                   | Valeur d'exemple                                |

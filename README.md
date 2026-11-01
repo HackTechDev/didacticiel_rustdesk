@@ -2,6 +2,8 @@
 
 Tutoriel en français pour héberger son propre serveur [RustDesk](https://rustdesk.com/) (hbbs + hbbr) dans un conteneur LXD, avec redirection des ports en mode `nat=true` pour conserver l'IP réelle des clients.
 
+Il décrit une installation adaptée à un cas d'usage précis (hôte Ubuntu avec LXD, serveur OSS installé par script, clients Linux). D'autres méthodes existent pour le serveur (Docker, paquets `.deb`, version Pro) et le client : le tutoriel les présente dans la section « Un cas d'usage parmi d'autres ».
+
 Il est publié sur le blog [labo.hacktech.dev](https://labo.hacktech.dev/), géré avec Grav.
 
 ## Contenu du dépôt

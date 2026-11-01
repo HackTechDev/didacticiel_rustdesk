@@ -13,7 +13,6 @@ Pistes d'amélioration pour `item.md` (« Installer un serveur RustDesk dans un 
 - [ ] **Debian 13 au lieu de Debian 12** : Debian 13 (Trixie) est sortie en août 2025, Debian 12 n'est plus la version stable. Vérifier d'abord que le script `techahold/rustdeskinstall` fonctionne sur Debian 13.
 - [ ] **Chaîne de configuration** (section 6) : le tutoriel dit qu'on peut l'importer, sans dire comment. Expliquer l'import (icône presse-papier du formulaire, visible sur `rustdesk07.png`) ou retirer la phrase.
 - [ ] **Démarrage automatique** : mentionner `lxc config set rustdesk boot.autostart true` pour que le conteneur redémarre avec l'hôte.
-- [ ] **Choix de la méthode d'installation** : préciser que `techahold/rustdeskinstall` est un script tiers, et citer les alternatives officielles (paquets `.deb` de `rustdesk-server`, Docker).
 
 ### Priorité basse
 
@@ -56,3 +55,4 @@ Pistes d'amélioration pour `item.md` (« Installer un serveur RustDesk dans un 
 - [x] README.md ajouté au dépôt.
 - [x] Section 14 « Sécurisation » : test de la clé obligatoire, SSH par clé, renvoi vers SECURITY.md.
 - [x] Section 15 « Désinstallation » : suppression du conteneur, des règles ufw, du DNS, réinitialisation des clients.
+- [x] Section « Un cas d'usage parmi d'autres » : contexte du tutoriel, autres méthodes d'installation du serveur (Docker, `.deb`, binaires, script, Pro) et formats du client par système.
