@@ -12,6 +12,7 @@ Il est publié sur le blog [labo.hacktech.dev](https://labo.hacktech.dev/), gér
 | `rustdesk01.png` à `rustdesk08.png` | Captures d'écran du client RustDesk utilisées dans le tutoriel |
 | [`SECURITY.md`](SECURITY.md) | Pistes de sécurisation du serveur, classées par priorité |
 | [`IMPROVEMENTS.md`](IMPROVEMENTS.md) | Améliorations prévues et déjà faites sur le tutoriel |
+| [`presentation/`](presentation/) | Supports pour présenter le tutoriel en une heure : diaporama Marp ([`slides.md`](presentation/slides.md)), script de démonstration ([`demo.md`](presentation/demo.md)) et fiche questions-réponses ([`questions-reponses.md`](presentation/questions-reponses.md)) |
 
 ## Ce que couvre le tutoriel
 
