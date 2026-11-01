@@ -56,9 +56,40 @@ Un serveur RustDesk se compose de deux programmes :
 
 ## Prérequis
 
-- Un serveur avec LXD installé et initialisé (`lxd init`).
-- Un accès SSH avec les droits sudo.
+- Un serveur Ubuntu avec un accès SSH et les droits sudo.
 - Une IP publique fixe, ou un nom de domaine qui pointe dessus.
+- LXD installé et initialisé (voir ci-dessous).
+
+### Installer LXD (si ce n'est pas déjà fait)
+
+Sur Ubuntu, LXD est distribué sous forme de paquet snap :
+
+```bash
+utilisateur@serveur:~$ sudo snap install lxd
+```
+
+Ajouter l'utilisateur au groupe `lxd`, pour pouvoir lancer les commandes `lxc` sans sudo :
+
+```bash
+utilisateur@serveur:~$ sudo usermod -aG lxd $USER
+```
+
+> Se déconnecter puis se reconnecter en SSH pour que l'appartenance au groupe soit prise en compte.
+
+Initialiser LXD. Les réponses par défaut conviennent : elles créent notamment le bridge `lxdbr0` et un espace de stockage.
+
+```bash
+utilisateur@serveur:~$ lxd init
+```
+
+Vérifier que tout fonctionne :
+
+```bash
+utilisateur@serveur:~$ lxc list
++------+-------+------+------+------+-----------+
+| NAME | STATE | IPV4 | IPV6 | TYPE | SNAPSHOTS |
++------+-------+------+------+------+-----------+
+```
 
 ## Pourquoi LXD ?
 
@@ -108,7 +139,7 @@ hbbs (21115, 21116) – hbbr (21117)
 
 Quelques termes utilisés dans la suite :
 
-- **Proxy device** : redirection de port déclarée dans la configuration LXD du conteneur. Avec `nat=true`, elle se traduit par une simple règle DNAT sur l'hôte.
+- **Proxy device** : redirection de port déclarée dans la configuration LXD du conteneur. Avec `nat=true`, elle se traduit par une simple règle DNAT sur l'hôte, sans aucun programme qui tourne. C'est l'équivalent de la page « Redirection de ports » d'une box : on déclare la redirection, LXD crée la règle. Par rapport à des règles nftables écrites à la main, LXD les crée et les supprime avec le conteneur, les conserve après un redémarrage de l'hôte, les inclut dans les exports et snapshots, et évite les conflits avec ses propres règles.
 - **NAT / DNAT** : le NAT réécrit les adresses des paquets. Le plus courant est le **SNAT**, qui change l'adresse **source** : c'est ce que fait une box internet quand un PC du réseau local sort sur Internet. Le **DNAT** change l'adresse **de destination** : c'est la « redirection de port » des box. Ici, un paquet destiné à `203.0.113.10:21116` est redirigé vers `10.10.10.50:21116`, sans toucher à sa source. Avec `nat=true`, LXD crée cette règle dans le noyau de l'hôte, au lieu de faire transiter le trafic par un programme intermédiaire. L'IP d'origine du client est ainsi conservée.
 - **Hole punching** : technique qui permet à deux postes situés derrière des box ou des pare-feu de se connecter directement l'un à l'autre, avec l'aide du serveur ID.
 - **INPUT / FORWARD** : chaînes du pare-feu Linux. *INPUT* filtre le trafic destiné à l'hôte lui-même, *FORWARD* celui qui le traverse pour aller ailleurs (ici, vers le conteneur).
@@ -202,7 +233,7 @@ utilisateur@serveur:~$ ip -4 addr show scope global
 
 L'IP publique est `203.0.113.10`, sur l'interface externe `eno1`. Ne pas la confondre avec `lxdbr0` (bridge LXD) ni avec `lxcbr0` (ancien bridge LXC, souvent inactif).
 
-> Ici, la mention `dynamic` indique que l'IP est attribuée par DHCP. Les proxy devices écoutent sur cette adresse précise : si elle change, la redirection cesse de fonctionner et il faut recréer les proxy devices. Vérifier que l'hébergeur garantit une IP stable.
+> Ici, la mention `dynamic` indique que l'IP est attribuée par DHCP. Les règles DNAT créées par les proxy devices ne redirigent que les paquets destinés à cette adresse précise : si elle change, la redirection cesse de fonctionner et il faut mettre à jour l'adresse `listen` des proxy devices. Vérifier que l'hébergeur garantit une IP stable.
 
 ## 5. Redirection des ports (proxy devices LXD)
 
@@ -294,7 +325,7 @@ utilisateur@poste:~$ dig +short rustdesk.example.com
 - Au lancement de `install.sh` (plus bas), répondre `2` (DNS/Domain) à la première question, puis saisir `rustdesk.example.com`.
 - Dans les clients (étape 10), indiquer `rustdesk.example.com` comme **Serveur ID** au lieu de l'IP.
 
-> Les proxy devices LXD (étape 5) écoutent toujours sur l'IP publique de l'hôte : le nom de domaine ne change rien côté serveur. En cas de changement d'IP, il faut donc mettre à jour **à la fois** l'enregistrement DNS et l'adresse `listen` des proxy devices.
+> Les règles DNAT des proxy devices (étape 5) visent toujours l'IP publique de l'hôte : le nom de domaine ne change rien côté serveur. En cas de changement d'IP, il faut donc mettre à jour **à la fois** l'enregistrement DNS et l'adresse `listen` des proxy devices.
 
 Si le serveur a déjà été installé avec une IP, il n'est pas nécessaire de relancer le script : il suffit de créer l'enregistrement DNS et de remplacer l'IP par le nom dans les clients. La clé reste la même.
 
@@ -438,6 +469,8 @@ utilisateur@poste:~$ ./rustdesk-1.5.0-x86_64.AppImage
 
 ![Fenêtre principale de RustDesk](rustdesk01.png)
 
+Le message « Pas prêt ; veuillez vérifier la connexion » en bas de la fenêtre est normal à ce stade : le client n'est pas encore configuré pour utiliser le serveur. Il disparaît après l'étape 10.
+
 > Sur les autres systèmes, télécharger le fichier correspondant sur la même page : `.exe` ou `.msi` pour Windows, `.dmg` pour macOS, `.deb` pour Debian/Ubuntu, `.apk` pour Android. La configuration de l'étape 10 est la même ; seule la disposition des menus varie un peu, notamment sur Android.
 
 ## 10. Configuration des clients RustDesk
@@ -482,7 +515,23 @@ Le message « Succès » confirme l'enregistrement :
 
 De retour sur l'onglet **Accueil**, le bas de la fenêtre doit afficher « Prêt » au lieu de « Pas prêt ; veuillez vérifier la connexion ».
 
-Pour se connecter, saisir l'**ID du poste distant** (celui affiché après le changement de serveur), puis son mot de passe.
+### Se connecter à un poste distant
+
+Une fois les deux postes configurés et « Prêt » :
+
+1. Sur le **poste distant** (celui à contrôler), relever dans l'onglet **Accueil**, panneau « Votre bureau » :
+   - l'**ID** du poste ;
+   - le **mot de passe à usage unique**, qui change à chaque session.
+
+   > L'ID peut changer après le passage au serveur auto-hébergé : toujours utiliser celui affiché **après** la configuration.
+
+2. Sur le **poste de contrôle**, saisir cet ID dans le champ « Contrôler un bureau à distance », puis cliquer sur **Se connecter** (le bouton bleu juste en dessous du champ).
+
+3. Saisir le mot de passe du poste distant, puis valider.
+
+4. Une nouvelle fenêtre s'ouvre et affiche le bureau du poste distant. Le clavier et la souris le contrôlent directement.
+
+> Le bouton **Connexion**, au centre de l'onglet Accueil, sert à se connecter à un compte RustDesk. Il ne fonctionne pas avec le serveur OSS (voir [Dépannage](#11-dépannage)).
 
 ## 11. Dépannage
 
@@ -497,7 +546,7 @@ ConnectError("tcp connect error", 203.0.113.10:21114, ... "Connexion refusée" }
 
 **Solution** :
 
-- Ne pas utiliser le bouton « Se connecter » du client. Avec le serveur OSS, on se connecte avec l'**ID et le mot de passe** du poste distant.
+- Ne pas utiliser le bouton **Connexion** (connexion à un compte), au centre de l'onglet Accueil. Avec le serveur OSS, on se connecte avec l'**ID et le mot de passe** du poste distant.
 - Laisser le champ **Serveur API** vide, y compris après l'import de la chaîne de configuration.
 - Ne pas ouvrir le port 21114.
 
@@ -667,7 +716,77 @@ La mise à jour conserve la paire de clés : les clients n'ont rien à reconfigu
 - **Redémarrer les services** : `systemctl restart rustdesksignal rustdeskrelay`
 - **Consulter les journaux** : `journalctl -u rustdesksignal -u rustdeskrelay -f`
 
-## 14. FAQ
+## 14. Sécurisation
+
+Deux vérifications essentielles. D'autres pistes sont détaillées dans le fichier [SECURITY.md](https://github.com/HackTechDev/didacticiel_rustdesk/blob/main/SECURITY.md) du dépôt du tutoriel.
+
+### Vérifier que la clé est obligatoire
+
+Si le serveur accepte des clients sans clé, n'importe qui peut l'utiliser comme relais et consommer sa bande passante.
+
+- **Test** : sur un poste, configurer le serveur ID avec une clé vide ou fausse. Si le client passe à « Prêt » et parvient à se connecter à un poste, la clé n'est pas imposée.
+- **Contrôle** : regarder les options de lancement des services (paramètre `-k`) :
+
+```bash
+root@rustdesk:~# grep ExecStart /etc/systemd/system/rustdesksignal.service /etc/systemd/system/rustdeskrelay.service
+```
+
+### Se connecter en SSH par clé
+
+L'étape 1 utilise un mot de passe. Une authentification par clé est plus sûre.
+
+- Sur le poste, créer une clé et la copier sur le serveur :
+
+```bash
+utilisateur@poste:~$ ssh-keygen -t ed25519
+utilisateur@poste:~$ ssh-copy-id utilisateur@serveur.example.com
+```
+
+- Vérifier que la connexion fonctionne **sans** mot de passe :
+
+```bash
+utilisateur@poste:~$ ssh utilisateur@serveur.example.com
+```
+
+- Désactiver ensuite les mots de passe dans `/etc/ssh/sshd_config` :
+
+```
+PasswordAuthentication no
+PermitRootLogin no
+```
+
+```bash
+utilisateur@serveur:~$ sudo systemctl restart ssh
+```
+
+> Garder une session SSH ouverte pendant le changement, pour ne pas perdre l'accès en cas d'erreur.
+
+## 15. Désinstallation
+
+Tout RustDesk se trouve dans le conteneur : le supprimer suffit à tout retirer.
+
+- Sauvegarder d'abord les clés si elles peuvent resservir (voir [Sauvegarde](#12-sauvegarde)).
+
+- Supprimer le conteneur, avec ses snapshots et ses proxy devices :
+
+```bash
+utilisateur@serveur:~$ lxc delete --force rustdesk
+```
+
+> Les règles DNAT créées par LXD disparaissent avec les proxy devices.
+
+- Supprimer les règles ufw, si elles ont été ajoutées :
+
+```bash
+utilisateur@serveur:~$ sudo ufw route delete allow proto tcp to 10.10.10.50 port 21115:21117
+utilisateur@serveur:~$ sudo ufw route delete allow proto udp to 10.10.10.50 port 21116
+```
+
+- Supprimer l'enregistrement DNS `rustdesk.example.com`, s'il a été créé.
+
+- Sur les clients, vider les champs **Serveur ID** et **Clé** pour revenir aux serveurs publics de RustDesk.
+
+## 16. FAQ
 
 ### Garder la priorité sur sa souris pendant une session
 
@@ -676,7 +795,7 @@ RustDesk ne donne pas la priorité à la souris locale : la fonction existe dans
 - couper ou rendre le contrôle clavier/souris en un clic, depuis l'icône dédiée de la fenêtre de connexion ;
 - passer en lecture seule par défaut : **Paramètres > Sécurité > Permissions**, puis décocher « Activer le clavier/la souris ».
 
-## 15. Sources
+## 17. Sources
 
 - [RustDesk – Installation OSS](https://rustdesk.com/docs/en/self-host/rustdesk-server-oss/install/)
 - [techahold/rustdeskinstall](https://github.com/techahold/rustdeskinstall)
