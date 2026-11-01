@@ -17,6 +17,10 @@ content:
 taxonomy:
     tag:
         - Rustdesk
+        - LXD
+        - Debian
+        - Auto-hébergement
+        - Bureau à distance
 feed:
     limit: 10
 metadata:
@@ -43,6 +47,7 @@ Ce tutoriel explique comment héberger son propre serveur RustDesk (hbbs + hbbr)
 | Services                  | `rustdesksignal` (hbbs), `rustdeskrelay` (hbbr) |
 | Clé publique              | `<CLE_PUBLIQUE>` (générée à l'installation)     |
 | Poste client              | `utilisateur@poste`                             |
+| Nom de domaine (option)   | `rustdesk.example.com`                          |
 
 ## Prérequis
 
@@ -158,7 +163,6 @@ L'IP publique est `203.0.113.10`, sur l'interface externe `eno1`. Ne pas la conf
 Ports à **ne pas** rediriger :
 
 - **21114** : API, réservée à la version Pro.
-- **21118 / 21119** : WebSocket pour le client web. Exposés directement, ils permettent d'usurper l'IP source. À n'ouvrir que derrière un reverse proxy.
 
 Sur l'hôte :
 
@@ -283,6 +287,30 @@ Réponses aux questions du script :
 | *Choose your preferred connection method*                  | Méthode de connexion (IP ou DNS)                      | `1` : IP (détection automatique), ou `2` si tu as un nom de domaine |
 | *Please choose if you want to download configs and install HTTP server* | Télécharger les configs et installer un serveur HTTP | `2` : Non (évite d'exposer un service web supplémentaire)         |
 
+### Utiliser un nom de domaine plutôt qu'une IP (conseillé)
+
+Avec un nom de domaine, les clients ne dépendent plus de l'IP du serveur. Si l'IP change, ou si le serveur est déplacé sur un autre hôte, il suffit de modifier l'enregistrement DNS : aucun client n'est à reconfigurer.
+
+- Chez ton fournisseur DNS, créer un enregistrement **A** qui pointe vers l'IP publique de l'hôte :
+
+| Nom                    | Type | Valeur         |
+|------------------------|------|----------------|
+| `rustdesk.example.com` | A    | `203.0.113.10` |
+
+- Vérifier depuis le poste que le nom est bien résolu :
+
+```bash
+utilisateur@poste:~$ dig +short rustdesk.example.com
+203.0.113.10
+```
+
+- Au lancement de `install.sh`, répondre `2` (DNS/Domain) à la première question, puis saisir `rustdesk.example.com`.
+- Dans les clients (étape 10), indiquer `rustdesk.example.com` comme **Serveur ID** au lieu de l'IP.
+
+> Les proxy devices LXD (étape 5) écoutent toujours sur l'IP publique de l'hôte : le nom de domaine ne change rien côté serveur. En cas de changement d'IP, il faut donc mettre à jour **à la fois** l'enregistrement DNS et l'adresse `listen` des proxy devices.
+
+Si le serveur a déjà été installé avec une IP, il n'est pas nécessaire de relancer le script : il suffit de créer l'enregistrement DNS et de remplacer l'IP par le nom dans les clients. La clé reste la même.
+
 **Note la clé publique.** Elle reste disponible dans le conteneur :
 
 ```bash
@@ -312,7 +340,7 @@ tcp   LISTEN 0   128   *:21117   *:*   users:(("hbbr",pid=1432,fd=9))
 tcp   LISTEN 0   128   *:21116   *:*   users:(("hbbs",pid=1203,fd=11))
 ```
 
-> Les ports 21118 et 21119 écoutent dans le conteneur, mais ils ne sont pas redirigés depuis l'hôte : ils restent inaccessibles depuis Internet.
+> Les ports 21118 et 21119 servent au client web, non utilisé ici : ils ne sont pas redirigés.
 
 ## 8. Test depuis un poste extérieur
 
@@ -384,11 +412,15 @@ Sur **chaque poste** (celui qui contrôle et celui qui est contrôlé) :
    | Clé                         | `<CLE_PUBLIQUE>` |
    | Autres champs (Relais, API) | vides            |
 
+   Avec un nom de domaine, saisir `rustdesk.example.com` dans **Serveur ID**.
+
 6. Cliquer sur **Valider**.
 
-Le bas de la fenêtre principale doit ensuite afficher « Prêt ».
+Le message « Succès » confirme l'enregistrement :
 
-![Statut Prêt](rustdesk08.png)
+![Message Succès](rustdesk08.png)
+
+De retour sur l'onglet **Accueil**, le bas de la fenêtre doit afficher « Prêt » au lieu de « Pas prêt ; veuillez vérifier la connexion ».
 
 Pour se connecter, saisir l'**ID du poste distant** (celui affiché après le changement de serveur), puis son mot de passe.
 
@@ -436,12 +468,155 @@ RustDesk ne donne pas la priorité à la souris locale : la fonction existe dans
 
 ## 13. Maintenance
 
-- **Mise à jour** : script `update.sh` du dépôt [techahold/rustdeskinstall](https://github.com/techahold/rustdeskinstall).
+### Mise à jour du serveur
+
+Le dépôt [techahold/rustdeskinstall](https://github.com/techahold/rustdeskinstall) fournit un script `update.sh` qui télécharge la dernière version de hbbs et hbbr.
+
+- Sur l'hôte, créer d'abord un snapshot pour pouvoir revenir en arrière (voir [Sauvegarde](#14-sauvegarde)) :
+
+```bash
+utilisateur@serveur:~$ lxc snapshot rustdesk avant-maj
+```
+
+- Entrer dans le conteneur :
+
+```bash
+utilisateur@serveur:~$ lxc exec rustdesk -- bash
+root@rustdesk:~#
+```
+
+- Télécharger le script de mise à jour :
+
+```bash
+root@rustdesk:~# wget https://raw.githubusercontent.com/techahold/rustdeskinstall/master/update.sh
+```
+
+- Rendre le script exécutable, puis le lancer :
+
+```bash
+root@rustdesk:~# chmod +x update.sh
+root@rustdesk:~# ./update.sh
+```
+
+- Vérifier que les services sont relancés :
+
+```bash
+root@rustdesk:~# systemctl list-units | grep -i rust
+  rustdeskrelay.service    loaded active running   Rustdesk Relay Server
+  rustdesksignal.service   loaded active running   Rustdesk Signal Server
+```
+
+- Si tout fonctionne, supprimer le snapshot depuis l'hôte :
+
+```bash
+utilisateur@serveur:~$ lxc delete rustdesk/avant-maj
+```
+
+> En cas de problème après la mise à jour : `lxc restore rustdesk avant-maj` sur l'hôte.
+
+La mise à jour conserve la paire de clés : les clients n'ont rien à reconfigurer.
+
+### Commandes utiles
+
 - **Clé publique** : `/opt/rustdesk/id_ed25519.pub`.
 - **Redémarrer les services** : `systemctl restart rustdesksignal rustdeskrelay`
 - **Consulter les journaux** : `journalctl -u rustdesksignal -u rustdeskrelay -f`
 
-## 14. Sources
+## 14. Sauvegarde
+
+Deux éléments sont à protéger :
+
+- **la paire de clés** `id_ed25519` / `id_ed25519.pub` : si elle est perdue, le serveur en génère une nouvelle et il faut reconfigurer **tous** les clients ;
+- **la base `db_v2.sqlite3`** : elle contient les ID des postes enregistrés.
+
+Tous ces fichiers se trouvent dans `/opt/rustdesk/`.
+
+### Snapshot du conteneur
+
+Sur l'hôte, créer un snapshot juste après l'installation :
+
+```bash
+utilisateur@serveur:~$ lxc snapshot rustdesk apres-install
+```
+
+- Lister les snapshots :
+
+```bash
+utilisateur@serveur:~$ lxc info rustdesk
+...
+Snapshots:
++---------------+----------------------+------------+----------+
+|     NAME      |       TAKEN AT       | EXPIRES AT | STATEFUL |
++---------------+----------------------+------------+----------+
+| apres-install | 2026/10/30 10:15 UTC |            | NO       |
++---------------+----------------------+------------+----------+
+```
+
+- Revenir à l'état du snapshot en cas de problème :
+
+```bash
+utilisateur@serveur:~$ lxc restore rustdesk apres-install
+```
+
+- Programmer un snapshot quotidien, conservé 7 jours :
+
+```bash
+utilisateur@serveur:~$ lxc config set rustdesk snapshots.schedule "@daily"
+utilisateur@serveur:~$ lxc config set rustdesk snapshots.expiry 7d
+```
+
+> Un snapshot est stocké sur le même disque que le conteneur : il ne protège pas d'une panne de l'hôte. Pour cela, il faut une copie externe.
+
+### Copie externe des clés et de la base
+
+- Copier les fichiers du conteneur vers l'hôte :
+
+```bash
+utilisateur@serveur:~$ mkdir -p ~/sauvegarde-rustdesk
+utilisateur@serveur:~$ lxc file pull rustdesk/opt/rustdesk/id_ed25519 \
+  rustdesk/opt/rustdesk/id_ed25519.pub \
+  rustdesk/opt/rustdesk/db_v2.sqlite3 ~/sauvegarde-rustdesk/
+utilisateur@serveur:~$ chmod 600 ~/sauvegarde-rustdesk/id_ed25519
+```
+
+- Les rapatrier ensuite sur le poste local :
+
+```bash
+utilisateur@poste:~$ scp -r utilisateur@serveur.example.com:sauvegarde-rustdesk ~/
+```
+
+> `id_ed25519` est la **clé privée** du serveur. Ne la partage jamais et conserve-la dans un endroit sûr.
+
+### Export complet du conteneur
+
+Pour sauvegarder le conteneur entier (système, configuration et snapshots) dans une archive :
+
+```bash
+utilisateur@serveur:~$ lxc export rustdesk rustdesk-sauvegarde.tar.gz
+```
+
+Pour le restaurer, sur le même hôte ou sur un autre :
+
+```bash
+utilisateur@serveur:~$ lxc import rustdesk-sauvegarde.tar.gz
+```
+
+> Sur un autre hôte, adapter ensuite l'adresse `listen` des proxy devices `rd-tcp` et `rd-udp` à la nouvelle IP publique.
+
+### Restaurer les clés sur une nouvelle installation
+
+Après une réinstallation, remettre les fichiers sauvegardés en place, puis redémarrer les services :
+
+```bash
+utilisateur@serveur:~$ lxc file push ~/sauvegarde-rustdesk/id_ed25519 \
+  ~/sauvegarde-rustdesk/id_ed25519.pub \
+  ~/sauvegarde-rustdesk/db_v2.sqlite3 rustdesk/opt/rustdesk/
+utilisateur@serveur:~$ lxc exec rustdesk -- systemctl restart rustdesksignal rustdeskrelay
+```
+
+Les clients gardent la même clé : aucune reconfiguration n'est nécessaire.
+
+## 15. Sources
 
 - [RustDesk – Installation OSS](https://rustdesk.com/docs/en/self-host/rustdesk-server-oss/install/)
 - [techahold/rustdeskinstall](https://github.com/techahold/rustdeskinstall)
