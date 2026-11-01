@@ -87,10 +87,29 @@ Le conteneur se trouve sur un réseau privé (`lxdbr0`). Les ports RustDesk sont
 
 Ce mode est essentiel : il préserve l'**IP réelle des clients**. Le serveur ID (hbbs) en a besoin pour établir des connexions directes entre les postes (*hole punching*). Sans lui, tout le trafic passe par le relais.
 
+Chemin d'une connexion :
+
+```
+Client RustDesk
+      │
+      ▼
+IP publique de l'hôte : 203.0.113.10
+ports 21115-21117 (TCP) et 21116 (UDP)
+      │
+      ▼
+Règle DNAT nftables, créée par LXD (nat=true)
+      │   adresse de destination réécrite, IP du client conservée
+      ▼
+Conteneur rustdesk : 10.10.10.50
+hbbs (21115, 21116) – hbbr (21117)
+```
+
+> En mode `nat=true`, aucun programme proxy ne relaie le trafic : le noyau de l'hôte redirige directement les paquets. Sans `nat=true`, un processus `forkproxy` de LXD recevrait les connexions et les rouvrirait vers le conteneur, qui verrait alors l'IP de l'hôte au lieu de celle du client.
+
 Quelques termes utilisés dans la suite :
 
-- **Proxy device** : redirection de port gérée par LXD, qui transmet le trafic arrivant sur l'hôte vers le conteneur.
-- **NAT / DNAT** : réécriture de l'adresse de destination des paquets. Avec `nat=true`, LXD crée cette règle dans le noyau de l'hôte, au lieu de faire transiter le trafic par un programme intermédiaire. L'IP d'origine du client est ainsi conservée.
+- **Proxy device** : redirection de port déclarée dans la configuration LXD du conteneur. Avec `nat=true`, elle se traduit par une simple règle DNAT sur l'hôte.
+- **NAT / DNAT** : le NAT réécrit les adresses des paquets. Le plus courant est le **SNAT**, qui change l'adresse **source** : c'est ce que fait une box internet quand un PC du réseau local sort sur Internet. Le **DNAT** change l'adresse **de destination** : c'est la « redirection de port » des box. Ici, un paquet destiné à `203.0.113.10:21116` est redirigé vers `10.10.10.50:21116`, sans toucher à sa source. Avec `nat=true`, LXD crée cette règle dans le noyau de l'hôte, au lieu de faire transiter le trafic par un programme intermédiaire. L'IP d'origine du client est ainsi conservée.
 - **Hole punching** : technique qui permet à deux postes situés derrière des box ou des pare-feu de se connecter directement l'un à l'autre, avec l'aide du serveur ID.
 - **INPUT / FORWARD** : chaînes du pare-feu Linux. *INPUT* filtre le trafic destiné à l'hôte lui-même, *FORWARD* celui qui le traverse pour aller ailleurs (ici, vers le conteneur).
 
